@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tinycrypt UI</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+
+        .card {
+            background: white;
+            padding: 1.2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 100px);
+            max-width: 1000px;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            text-align: center;
+        }
+
+        .field {
+            margin-bottom: 0.8rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        textarea {
+            height: 180px;
+            resize: vertical;
+        }
+
+        .file-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-input-wrapper {
+            flex: 1;
+        }
+
+        #preview {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            object-fit: cover;
+            display: none;
+        }
+
+        #status {
+            margin-top: 1rem;
+            padding: 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+            font-size: 0.8rem;
+            min-height: 120px;
+            max-height: 200px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+        }
+
+        .error-text {
+            color: red;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 8px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: #666;
+            margin: 4px 0 0 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>Password Manager</h2>
+
+        <div class="field">
+            <label>Save As (Filename)</label>
+            <input type="text" id="saveName" placeholder="e.g. my_secret.txt or photo.jpg">
+        </div>
+
+        <div class="field">
+            <label>Media Type</label>
+            <select id="mediaType" onchange="toggleMedia()">
+                <option value="text">Text</option>
+                <option value="file">File</option>
+            </select>
+        </div>
+
+        <div id="textArea" class="field">
+            <label>Content</label>
+            <textarea id="textContent" placeholder="Enter content..."></textarea>
+        </div>
+
+        <div id="fileArea" class="field hidden">
+            <label>Select File</label>
+            <div class="file-upload-container">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileContent" onchange="handleFileSelect(this)">
+                </div>
+                <img id="preview" alt="Preview">
+            </div>
+            <p class="hint">Or paste an image from the clipboard.</p>
+        </div>
+
+        <div class="field">
+            <label>Password</label>
+            <input type="password" id="pw1">
+        </div>
+        <div class="field">
+            <label>Confirm Password</label>
+            <input type="password" id="pw2">
+        </div>
+
+        <button onclick="process()">Process</button>
+
+        <div id="status">Ready</div>
+    </div>
+
+    <script>
+        let pastedFile = null;
+
+        function setStatus(msg, isError = false) {
+            const s = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            const colorClass = isError ? 'error-text' : '';
+            const newEntry = `<div class="${colorClass}">[${timestamp}] ${msg}</div>`;
+
+            if (s.innerText === "Ready") {
+                s.innerHTML = "";
+            }
+
+            s.innerHTML += newEntry;
+            s.scrollTop = s.scrollHeight;
+        }
+
+        function toggleMedia() {
+            const type = document.getElementById('mediaType').value;
+            document.getElementById('textArea').classList.toggle('hidden', type !== 'text');
+            document.getElementById('fileArea').classList.toggle('hidden', type !== 'file');
+            if (type === 'text') resetFile();
+        }
+
+        function resetFile() {
+            pastedFile = null;
+            document.getElementById('fileContent').value = "";
+            document.getElementById('preview').style.display = 'none';
+        }
+
+        function showPreview(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                document.getElementById('preview').style.display = 'none';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const prev = document.getElementById('preview');
+                prev.src = e.target.result;
+                prev.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                showPreview(file);
+                document.getElementById('saveName').value = file.name;
+                setStatus(`File selected: ${file.name}`);
+            }
+        }
+
+        window.addEventListener('paste', async (e) => {
+            const type = document.getElementById('mediaType').value;
+            if (type !== 'file') return;
+
+            const items = e.clipboardData.items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    pastedFile = item.getAsFile();
+                    showPreview(pastedFile);
+
+                    const extension = pastedFile.type.split('/')[1] || 'png';
+                    if (!document.getElementById('saveName').value) {
+                        document.getElementById('saveName').value = `image.${extension}`;
+                    }
+
+                    setStatus(`Image pasted (${pastedFile.name || 'clipboard_image'})`);
+                }
+            }
+        });
+
+        async function process() {
+            const saveName = document.getElementById('saveName').value;
+            const pw1 = document.getElementById('pw1').value;
+            const pw2 = document.getElementById('pw2').value;
+            const mediaType = document.getElementById('mediaType').value;
+
+            if (!saveName) {
+                setStatus("Error: Filename (Save As) is required.", true);
+                return;
+            }
+            if (!pw1) {
+                setStatus("Error: Password is required.", true);
+                return;
+            }
+            if (pw1 !== pw2) {
+                setStatus("Error: Passwords do not match.", true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("filename", saveName);
+            formData.append("password", pw1);
+            formData.append("mediaType", mediaType);
+
+            if (mediaType === 'text') {
+                formData.append("content", document.getElementById('textContent').value);
+            } else {
+                const fileInput = document.getElementById('fileContent').files[0];
+                const fileToUpload = fileInput || pastedFile;
+                if (!fileToUpload) {
+                    setStatus("Error: Please select or paste a file.", true);
+                    return;
+                }
+                formData.append("content", fileToUpload);
+            }
+
+            try {
+                const res = await fetch('/encrypt', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    setStatus(data.msg);
+                } else {
+                    setStatus(data.msg, true);
+                }
+            } catch (e) {
+                setStatus("Error: Server connection failed", true);
+            }
+        }
+    </script>
+</body>
+
+</html>
