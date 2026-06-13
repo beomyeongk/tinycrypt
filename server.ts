@@ -8,7 +8,7 @@ const { port, savePath, iterations } = config;
 
 await mkdir(savePath, { recursive: true });
 
-console.log(`🚀 Password Manager server is running at http://0.0.0.0:${port}`);
+console.log(`Server is running at http://0.0.0.0:${port}`);
 
 serve({
   port: port,
@@ -36,7 +36,15 @@ serve({
         }
 
         const finalFileName = `${userFilename}.enc`;
-        const fullPath = path.join(savePath, finalFileName);
+        const resolvedBase = path.resolve(savePath);
+        const fullPath = path.resolve(resolvedBase, finalFileName);
+
+        // Path containment validation
+        const relative = path.relative(resolvedBase, fullPath);
+        const isSafe = relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+        if (!isSafe) {
+          return new Response(JSON.stringify({ success: false, msg: "Invalid filename path." }), { status: 400 });
+        }
 
         try {
           await access(fullPath);
@@ -67,6 +75,7 @@ serve({
           ciphertext
         ]);
 
+        await mkdir(path.dirname(fullPath), { recursive: true });
         await writeFile(fullPath, finalBuffer);
 
         return new Response(JSON.stringify({ success: true, msg: `Saved successfully: ${finalFileName}` }));
