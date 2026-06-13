@@ -46,11 +46,8 @@ serve({
           return new Response(JSON.stringify({ success: false, msg: "Invalid filename path." }), { status: 400 });
         }
 
-        try {
-          await access(fullPath);
+        if (await Bun.file(fullPath).exists()) {
           return new Response(JSON.stringify({ success: false, msg: "File already exists." }), { status: 409 });
-        } catch {
-          // File does not exist, proceed
         }
 
         const salt = randomBytes(8);
